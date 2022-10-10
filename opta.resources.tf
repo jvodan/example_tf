@@ -18,14 +18,13 @@ resource "aws_iam_role" "ecs_task_execution_role" {
 EOF
 }
 
-resource "aws_iam_role_policy_attachment" "ecs-task-execution-role-policy-attachment" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
 
-resource "aws_iam_role_policy_attachment" "Getparameters" {
-  role       = aws_iam_role.ecs_task_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
+
+
+resource "aws_iam_role_policy_attachment" "ecs-task-execution-role-policy-attachment" {
+  #role       = aws_iam_role.ecs_task_execution_role.name
+  role = aws_iam_role.ecs_task_execution_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 
@@ -34,18 +33,19 @@ resource "aws_ecs_task_definition" "applications-opta" {
   memory = 2048
   cpu = 1024
   family = "opta"
-  #task_role_arn  =  aws_iam_role.ecs_task_role.arn
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+
   tags = {
     Name = "applications-opta"
-    Environment = "var.app_environment"
+    Environment = "var.app_environment.test"
     }
   requires_compatibilities = ["FARGATE"]
   container_definitions = jsonencode([
       {
         name = "applications-opta"
         #image =  "applications-container-registry/applications_opta:latest"
-	image = "910122582945.dkr.ecr.ap-southeast-2.amazonaws.com/applications-container-registry:applications_opta"
+	image = "library/httpd:2.4"
+	#image = "910122582945.dkr.ecr.ap-southeast-2.amazonaws.com/applications-container-registry:applications_opta"
         essential = true
         cpu = 10
         memory = 256
@@ -67,8 +67,7 @@ resource "aws_lb" "applications-opta" {
     Environment = "var.app_environment"
     }
   subnets         = [
-    aws_subnet.subnet-a.id,
-    aws_subnet.subnet-b.id
+    aws_subnet.subnet-a.id, aws_subnet.subnet-b.id
     ]
   security_groups = [
     aws_security_group.applications-security-group.id
@@ -76,7 +75,6 @@ resource "aws_lb" "applications-opta" {
   depends_on      = [
     aws_security_group.applications-security-group,
     aws_subnet.subnet-a,
-    aws_subnet.subnet-b
     ]
   }
 
@@ -122,7 +120,3 @@ resource "aws_route_table_association" "applications-opta-a" {
   route_table_id = aws_route_table.route-table-a.id
   }
 
-resource "aws_route_table_association" "applications-opta-b" {
-  subnet_id = aws_subnet.subnet-b.id
-  route_table_id = aws_route_table.route-table-b.id
-  }

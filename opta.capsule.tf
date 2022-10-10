@@ -20,6 +20,7 @@ resource "aws_ecs_service" "applications-opta" {
     }
   network_configuration {
     subnets = [aws_subnet.subnet-a.id]
+     assign_public_ip = true
     security_groups =[aws_security_group.applications-security-group.id]
     }
   }
