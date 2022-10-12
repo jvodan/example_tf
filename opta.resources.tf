@@ -19,8 +19,6 @@ EOF
 }
 
 
-
-
 resource "aws_iam_role_policy_attachment" "ecs-task-execution-role-policy-attachment" {
   #role       = aws_iam_role.ecs_task_execution_role.name
   role = aws_iam_role.ecs_task_execution_role.name
@@ -43,7 +41,6 @@ resource "aws_ecs_task_definition" "applications-opta" {
   container_definitions = jsonencode([
       {
         name = "applications-opta"
-        #image =  "applications-container-registry/applications_opta:latest"
 	image = "library/httpd:2.4"
 	#image = "910122582945.dkr.ecr.ap-southeast-2.amazonaws.com/applications-container-registry:applications_opta"
         essential = true
@@ -67,14 +64,14 @@ resource "aws_lb" "applications-opta" {
     Environment = "var.app_environment"
     }
   subnets         = [
-    aws_subnet.subnet-a.id, aws_subnet.subnet-b.id
+    aws_subnet.subnet-opta-a.id, aws_subnet.subnet-opta-b.id
     ]
   security_groups = [
-    aws_security_group.applications-security-group.id
+    aws_security_group.opta-security-group.id
     ]
   depends_on      = [
-    aws_security_group.applications-security-group,
-    aws_subnet.subnet-a,
+    aws_security_group.opta-security-group,
+    aws_subnet.subnet-opta-a, aws_subnet.subnet-opta-b
     ]
   }
 
@@ -115,8 +112,76 @@ resource "aws_lb_listener" "applications-opta" {
     }
   }
 
-resource "aws_route_table_association" "applications-opta-a" {
-  subnet_id = aws_subnet.subnet-a.id
-  route_table_id = aws_route_table.route-table-a.id
+
+#note subnet a 10 and subnet b +1 =11 not a standard but adds clarity up to user but ...
+
+resource "aws_subnet" "subnet-opta-a" {
+  cidr_block = "10.111.10.0/24"
+  availability_zone = "ap-southeast-2a"
+  tags = {
+    Name = "subnet-opta-a"
+    Environment = "var.app_environment"
+    }
+  vpc_id = aws_vpc.applications-vpc.id
   }
 
+resource "aws_subnet" "subnet-opta-b" {
+  cidr_block = "10.111.11.0/24"
+  availability_zone = "ap-southeast-2b"
+  tags = {
+    Name = "subnet-opta-b"
+    Environment = "var.app_environment"
+    }
+  vpc_id = aws_vpc.applications-vpc.id
+  }
+
+
+
+resource "aws_route_table_association" "applications-opta-a" {
+  subnet_id = aws_subnet.subnet-opta-a.id
+  route_table_id = aws_route_table.route-table-vpc.id
+  }
+
+resource "aws_route_table_association" "applications-opta-b" {
+  subnet_id = aws_subnet.subnet-opta-b.id
+  route_table_id = aws_route_table.route-table-vpc.id
+  }
+
+
+
+
+
+resource "aws_security_group" "opta-security-group" {
+  name = "opta-security-group"
+  tags = {
+    Name = "opta-security-group"
+    Environment = "var.app_environment"
+    }
+  vpc_id = aws_vpc.applications-vpc.id
+  ingress {
+    from_port        = 0
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    }
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+    }
+  }
+
+resource "aws_route53_record" "opta-cname" {
+  zone_id = "ZARIYTT7C12LN"
+  name    = "opta"
+  type    = "CNAME"
+	
+  alias {
+    name                   = aws_lb.applications-opta.dns_name
+    zone_id                = aws_lb.applications-opta.zone_id
+    evaluate_target_health = true
+  }
+
+}
